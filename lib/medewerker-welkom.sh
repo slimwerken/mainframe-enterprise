@@ -113,6 +113,10 @@ EOF
   say "ik/over-mij.md aangemaakt."
 fi
 [ -f "$DIR/mijn-projecten/LEES-MIJ.md" ] || printf '# Mijn projecten\n\nJouw eigen werk. Blijft prive tot je zegt "deel dit met het bedrijf".\n' > "$DIR/mijn-projecten/LEES-MIJ.md"
+# Persoonlijk geheugen + veilige sleutel-plek voorbereiden (privé, in de kluis).
+mkdir -p "$DIR/ik/memory"
+[ -f "$DIR/ik/memory/MEMORY.md" ] || printf '# Mijn geheugen\n\nPersoonlijke notities die Claude tussen sessies onthoudt. Prive: alleen op jouw computer en in je kluis.\n\n- (nog leeg)\n' > "$DIR/ik/memory/MEMORY.md"
+[ -f "$DIR/ik/.env" ] || printf '# Jouw persoonlijke sleutels (API-keys, tokens). PRIVE: staat nergens gedeeld, gaat alleen mee in je kluis.\n# Koppel een dienst met /koppel; Claude zet de sleutel hier veilig neer.\n' > "$DIR/ik/.env"
 
 # 6. Schrijf de aansluit-config (leest /einde straks).
 mkdir -p "$DIR/.mainframe"

@@ -105,6 +105,13 @@ if (-not (Test-Path $overMij)) {
 }
 $leesmij = Join-Path $Dir "mijn-projecten\LEES-MIJ.md"
 if (-not (Test-Path $leesmij)) { "# Mijn projecten`n`nJouw eigen werk. Blijft prive tot je zegt `"deel dit met het bedrijf`"." | Set-Content -Encoding UTF8 $leesmij }
+# Persoonlijk geheugen + veilige sleutel-plek voorbereiden (prive, in de kluis).
+$mem = Join-Path $Dir "ik\memory"
+New-Item -ItemType Directory -Force -Path $mem | Out-Null
+$memFile = Join-Path $mem "MEMORY.md"
+if (-not (Test-Path $memFile)) { "# Mijn geheugen`n`nPersoonlijke notities die Claude tussen sessies onthoudt. Prive: alleen op jouw computer en in je kluis.`n`n- (nog leeg)" | Set-Content -Encoding UTF8 $memFile }
+$envFile = Join-Path $Dir "ik\.env"
+if (-not (Test-Path $envFile)) { "# Jouw persoonlijke sleutels (API-keys, tokens). PRIVE: staat nergens gedeeld, gaat alleen mee in je kluis.`n# Koppel een dienst met /koppel; Claude zet de sleutel hier veilig neer." | Set-Content -Encoding UTF8 $envFile }
 
 # 6. Aansluit-config voor /einde.
 $mf = Join-Path $Dir ".mainframe"
