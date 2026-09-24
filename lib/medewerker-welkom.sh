@@ -45,8 +45,19 @@ if [ -z "$GH" ]; then say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth 
 say "Ingelogd als $GH."
 
 # 3. Vraag de resolver welke lagen jij mag ophalen (veilig, geen geheimen).
-RESP="$(curl -fsS "$ENDPOINT/enterprise/mijn-lagen?slug=$SLUG&github_username=$GH")" || {
-  say "Kon de aansluit-server niet bereiken. Check je internet en probeer opnieuw."; exit 1; }
+# Alleen de eigen vertrouwde HTTPS-host mag het GitHub-token ontvangen.
+if [ "$ENDPOINT" != "https://efficient-retriever-70.eu-west-1.convex.site" ]; then
+  say "Deze aansluit-server is niet vertrouwd. Verwijder MF_ENDPOINT en probeer opnieuw."; exit 1
+fi
+MF_GH_TOKEN="$(gh auth token --hostname github.com 2>/dev/null)" || {
+  say "Je GitHub-login is verlopen. Log opnieuw in met 'gh auth login'."; exit 1; }
+if [ -z "$MF_GH_TOKEN" ]; then say "Je GitHub-login is verlopen. Log opnieuw in met 'gh auth login'."; exit 1; fi
+# Via stdin: het token komt niet als argument in de proceslijst of in de URL.
+RESP="$(printf 'header = "Authorization: Bearer %s"\n' "$MF_GH_TOKEN" | curl --config - -fsS --get \
+  --data-urlencode "slug=$SLUG" --data-urlencode "github_username=$GH" "$ENDPOINT/enterprise/mijn-lagen")" || {
+  unset MF_GH_TOKEN
+  say "Aansluiten lukt niet. Controleer je GitHub-login en probeer opnieuw."; exit 1; }
+unset MF_GH_TOKEN
 OK="$(printf '%s\n' "$RESP" | sed -n 's/^ok=//p' | head -1)"
 if [ "$OK" != "true" ]; then
   REDEN="$(printf '%s\n' "$RESP" | sed -n 's/^reden=//p' | head -1)"

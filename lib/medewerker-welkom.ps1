@@ -33,9 +33,19 @@ if (-not $Gh) { Say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth login'
 Say "Ingelogd als $Gh."
 
 # 3. Vraag de resolver welke lagen jij mag ophalen.
+if ($Endpoint -ne "https://efficient-retriever-70.eu-west-1.convex.site") {
+  Say "Deze aansluit-server is niet vertrouwd. Verwijder MF_ENDPOINT en probeer opnieuw."; exit 1
+}
+$MfGhToken = ([string](& gh auth token --hostname github.com 2>$null)).Trim()
+if ($LASTEXITCODE -ne 0 -or -not $MfGhToken) {
+  Say "Je GitHub-login is verlopen. Log opnieuw in met 'gh auth login'."; exit 1
+}
 try {
-  $resp = (Invoke-WebRequest -UseBasicParsing -Uri "$Endpoint/enterprise/mijn-lagen?slug=$Slug&github_username=$Gh").Content
-} catch { Say "Kon de aansluit-server niet bereiken. Check je internet."; exit 1 }
+  $slugQuery = [uri]::EscapeDataString($Slug)
+  $ghQuery = [uri]::EscapeDataString($Gh)
+  $resp = (Invoke-WebRequest -UseBasicParsing -Headers @{ Authorization = "Bearer $MfGhToken" } -Uri "$Endpoint/enterprise/mijn-lagen?slug=$slugQuery&github_username=$ghQuery").Content
+} catch { Say "Aansluiten lukt niet. Controleer je GitHub-login en probeer opnieuw."; exit 1 }
+finally { $MfGhToken = $null }
 $lines = $resp -split "`n"
 function Field($k) { ($lines | Where-Object { $_ -match "^$k=" } | Select-Object -First 1) -replace "^$k=","" }
 if ((Field "ok") -ne "true") {
