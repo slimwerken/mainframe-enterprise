@@ -4,7 +4,11 @@
 #
 # Env: MF_SLUG (verplicht), MF_DIR (default $HOME\mijn-mainframe), MF_GH, MF_VOORNAAM,
 #      MF_ENDPOINT (default de Mainframe Convex-host), MF_DRYRUN=1
-$ErrorActionPreference = "Stop"
+# "Continue" en niet "Stop": in Windows PowerShell 5.1 (de standaard op Windows) telt een
+# foutregel van git of gh die je met 2>$null wegstuurt als een fout. Met "Stop" brak het
+# script dan af, bijvoorbeeld bij iemand die nog niet was ingelogd, VOOR de inlogstap.
+# Fouten controleren we hieronder zelf met $LASTEXITCODE.
+$ErrorActionPreference = "Continue"
 
 function Say($m) { Write-Host "  $m" }
 
@@ -28,7 +32,8 @@ if ($LASTEXITCODE -ne 0) {
   if ($env:MF_DRYRUN -ne "1") { & gh auth login --web }
 }
 & gh auth setup-git 2>$null | Out-Null
-$Gh = if ($env:MF_GH) { $env:MF_GH } else { (& gh api user --jq .login).Trim() }
+$Gh = $env:MF_GH
+if (-not $Gh) { $ghUit = & gh api user --jq .login 2>$null; if ($ghUit) { $Gh = ([string]$ghUit).Trim() } }
 if (-not $Gh) { Say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth login'."; exit 1 }
 Say "Ingelogd als $Gh."
 
@@ -43,7 +48,7 @@ if ($LASTEXITCODE -ne 0 -or -not $MfGhToken) {
 try {
   $slugQuery = [uri]::EscapeDataString($Slug)
   $ghQuery = [uri]::EscapeDataString($Gh)
-  $resp = (Invoke-WebRequest -UseBasicParsing -Headers @{ Authorization = "Bearer $MfGhToken" } -Uri "$Endpoint/enterprise/mijn-lagen?slug=$slugQuery&github_username=$ghQuery").Content
+  $resp = (Invoke-WebRequest -UseBasicParsing -ErrorAction Stop -Headers @{ Authorization = "Bearer $MfGhToken" } -Uri "$Endpoint/enterprise/mijn-lagen?slug=$slugQuery&github_username=$ghQuery").Content
 } catch { Say "Aansluiten lukt niet. Controleer je GitHub-login en probeer opnieuw."; exit 1 }
 finally { $MfGhToken = $null }
 $lines = $resp -split "`n"
@@ -81,7 +86,13 @@ if ($env:MF_DRYRUN -eq "1") {
 # 4. Clone bedrijf-laag naar ROOT, de rest als submappen.
 function CloneOrPull($url, $dest) {
   if (Test-Path (Join-Path $dest ".git")) { & git -C $dest pull -q --no-rebase 2>$null }
-  else { & git clone -q $url $dest }
+  else {
+    & git clone -q $url $dest
+    if ($LASTEXITCODE -ne 0) {
+      Say "Ophalen van $url lukt niet. Heb je de uitnodiging in je mail (van GitHub) al geaccepteerd?"
+      exit 1
+    }
+  }
 }
 New-Item -ItemType Directory -Force -Path (Split-Path $Dir) | Out-Null
 foreach ($p in $lagen) {

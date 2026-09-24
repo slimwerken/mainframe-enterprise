@@ -26,13 +26,14 @@ Installeer wat mist (of geef de persoon de link) en ga pas verder als alles er i
 Run het meegeleverde script. Het regelt de GitHub-login, vraagt de veilige resolver welke
 lagen deze persoon mag ophalen, en cloont ALLEEN die lagen als submappen onder `mijn-mainframe/`.
 
-- Mac/Linux, of Windows met git-bash:
+- **Mac, Linux en Windows** (Claude Code op Windows werkt met Git Bash, dus dit werkt daar ook):
   ```sh
   MF_SLUG="<bedrijf-slug>" sh <pad-naar-deze-repo>/lib/medewerker-welkom.sh
   ```
-- Windows PowerShell (zonder git-bash):
+- **Reserve voor Windows**, alleen als Git Bash er echt niet is. Windows staat scripts standaard
+  niet toe, dus altijd met `-ExecutionPolicy Bypass` (anders: "running scripts is disabled"):
   ```powershell
-  $env:MF_SLUG="<bedrijf-slug>"; & "<pad-naar-deze-repo>\lib\medewerker-welkom.ps1"
+  $env:MF_SLUG="<bedrijf-slug>"; powershell -NoProfile -ExecutionPolicy Bypass -File "<pad-naar-deze-repo>\lib\medewerker-welkom.ps1"
   ```
 Geef de voornaam mee als je die weet: `MF_VOORNAAM="Bart"` (Mac) / `$env:MF_VOORNAAM="Bart"` (Win).
 
@@ -53,7 +54,8 @@ Sluit af met: "typ `/einde` als je klaar bent, dan sla ik je werk op de juiste p
 Doe dan zelf, in een lege werkmap `mijn-mainframe/`:
 1. `gh auth login --web` (eigen account) en pak de naam: `gh api user --jq .login`.
 2. Haal de lagen op:
-   `curl -fsS "https://efficient-retriever-70.eu-west-1.convex.site/enterprise/mijn-lagen?slug=<SLUG>&github_username=<NAAM>"`
+   `curl -fsS -H "Authorization: Bearer $(gh auth token)" "https://efficient-retriever-70.eu-west-1.convex.site/enterprise/mijn-lagen?slug=<SLUG>&github_username=<NAAM>"`
+   (Zonder die GitHub-login weigert de server met 401; zo weet hij zeker dat jij het bent.)
    Dit geeft regels `ok=true`, `github_org=...`, `persoonlijk_repo=...` en `laag=..<tab>repo=..`.
    Bij `ok=false` (bv `geen_lid`): leg vriendelijk uit dat de beheerder de persoon eerst moet toevoegen.
 3. Clone de laag `bedrijf` naar de ROOT van `mijn-mainframe/`; de andere lagen (`bedrijfsprojecten`,
