@@ -15,7 +15,7 @@ set -e
 
 SLUG="${MF_SLUG:?zet MF_SLUG op je bedrijf (bv test-bv)}"
 DIR="${MF_DIR:-$HOME/mijn-mainframe}"
-ENDPOINT="${MF_ENDPOINT:-https://efficient-retriever-70.eu-west-1.convex.site}"
+ENDPOINT="${MF_ENDPOINT:-https://api.slimwerken.ai}"
 TAB="$(printf '\t')"
 
 say() { printf '  %s\n' "$1"; }
@@ -37,7 +37,7 @@ fi
 # 2. Inloggen met je eigen GitHub-account.
 if ! gh auth status >/dev/null 2>&1; then
   say "Je moet even inloggen met je eigen GitHub-account."
-  [ "$MF_DRYRUN" = "1" ] || gh auth login --web
+  [ "$MF_DRYRUN" = "1" ] || gh auth login --web -h github.com --git-protocol https
 fi
 gh auth setup-git >/dev/null 2>&1 || true
 GH="${MF_GH:-$(gh api user --jq .login 2>/dev/null || true)}"
@@ -46,7 +46,7 @@ say "Ingelogd als $GH."
 
 # 3. Vraag de resolver welke lagen jij mag ophalen (veilig, geen geheimen).
 # Alleen de eigen vertrouwde HTTPS-host mag het GitHub-token ontvangen.
-if [ "$ENDPOINT" != "https://efficient-retriever-70.eu-west-1.convex.site" ]; then
+if [ "$ENDPOINT" != "https://api.slimwerken.ai" ]; then
   say "Deze aansluit-server is niet vertrouwd. Verwijder MF_ENDPOINT en probeer opnieuw."; exit 1
 fi
 MF_GH_TOKEN="$(gh auth token --hostname github.com 2>/dev/null)" || {
@@ -75,6 +75,19 @@ PERS="$(printf '%s\n' "$RESP" | sed -n 's/^persoonlijk_repo=//p' | head -1)"
 BOARD="$(printf '%s\n' "$RESP" | sed -n 's/^is_board=//p' | head -1)"
 [ -n "$MF_VOORNAAM" ] && NAAM="$MF_VOORNAAM"
 say "Bedrijf gevonden: org $ORG. Ik haal alleen jouw lagen op."
+
+# 3b. Openstaande GitHub-uitnodigingen van dit bedrijf zelf accepteren. Zonder dat geeft
+# ophalen een 404 ("repository not found"): de meest voorkomende vastloper bij Horti (juli 2026).
+if [ "$MF_DRYRUN" != "1" ]; then
+  if gh api -X PATCH "user/memberships/orgs/$ORG" -f state=active >/dev/null 2>&1; then
+    say "Lid van de organisatie $ORG."
+  else
+    say "Let op: accepteer de uitnodiging van $ORG via https://github.com/orgs/$ORG/invitation en draai dit opnieuw."
+  fi
+  for id in $(gh api user/repository_invitations --jq ".[] | select(.repository.owner.login==\"$ORG\") | .id" 2>/dev/null); do
+    gh api -X PATCH "user/repository_invitations/$id" >/dev/null 2>&1 && say "Uitnodiging voor je kluis geaccepteerd."
+  done
+fi
 
 if [ "$MF_DRYRUN" = "1" ]; then
   say "[dry-run] zou naar $DIR clonen:"

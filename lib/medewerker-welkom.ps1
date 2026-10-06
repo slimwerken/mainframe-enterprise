@@ -15,7 +15,7 @@ function Say($m) { Write-Host "  $m" }
 $Slug = $env:MF_SLUG
 if (-not $Slug) { Say "Zet MF_SLUG op je bedrijf (bv test-bv)."; exit 1 }
 $Dir = if ($env:MF_DIR) { $env:MF_DIR } else { Join-Path $HOME "mijn-mainframe" }
-$Endpoint = if ($env:MF_ENDPOINT) { $env:MF_ENDPOINT } else { "https://efficient-retriever-70.eu-west-1.convex.site" }
+$Endpoint = if ($env:MF_ENDPOINT) { $env:MF_ENDPOINT } else { "https://api.slimwerken.ai" }
 
 # 1. Gereedschap.
 foreach ($t in @("git","gh")) {
@@ -29,7 +29,7 @@ foreach ($t in @("git","gh")) {
 & gh auth status 2>$null | Out-Null
 if ($LASTEXITCODE -ne 0) {
   Say "Je moet even inloggen met je eigen GitHub-account."
-  if ($env:MF_DRYRUN -ne "1") { & gh auth login --web }
+  if ($env:MF_DRYRUN -ne "1") { & gh auth login --web -h github.com --git-protocol https }
 }
 & gh auth setup-git 2>$null | Out-Null
 $Gh = $env:MF_GH
@@ -38,7 +38,7 @@ if (-not $Gh) { Say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth login'
 Say "Ingelogd als $Gh."
 
 # 3. Vraag de resolver welke lagen jij mag ophalen.
-if ($Endpoint -ne "https://efficient-retriever-70.eu-west-1.convex.site") {
+if ($Endpoint -ne "https://api.slimwerken.ai") {
   Say "Deze aansluit-server is niet vertrouwd. Verwijder MF_ENDPOINT en probeer opnieuw."; exit 1
 }
 $MfGhToken = ([string](& gh auth token --hostname github.com 2>$null)).Trim()
@@ -63,6 +63,7 @@ if ((Field "ok") -ne "true") {
   exit 1
 }
 $Org = Field "github_org"; $Naam = Field "naam"; $Pers = Field "persoonlijk_repo"; $Board = Field "is_board"
+if ($Board -ne "true") { $Board = "false" }
 if ($env:MF_VOORNAAM) { $Naam = $env:MF_VOORNAAM }
 Say "Bedrijf gevonden: org $Org. Ik haal alleen jouw lagen op."
 
@@ -73,6 +74,27 @@ foreach ($l in $lines) {
     $laag = ($parts[0]) -replace "^laag=",""
     $repo = ($parts[1]) -replace "^repo=",""
     $lagen += ,@($laag,$repo)
+  }
+}
+
+# 3b. Openstaande GitHub-uitnodigingen van dit bedrijf zelf accepteren. Zonder dat geeft
+# ophalen een 404: de meest voorkomende vastloper bij Horti (juli 2026).
+if ($env:MF_DRYRUN -ne "1") {
+  & gh api -X PATCH "user/memberships/orgs/$Org" -f state=active 2>$null | Out-Null
+  if ($LASTEXITCODE -eq 0) { Say "Lid van de organisatie $Org." }
+  else { Say "Let op: accepteer de uitnodiging van $Org via https://github.com/orgs/$Org/invitation en draai dit opnieuw." }
+  # Filteren in PowerShell zelf: aanhalingstekens in een --jq-argument raken in
+  # Windows PowerShell 5.1 kwijt onderweg naar gh.
+  $inv = (& gh api user/repository_invitations 2>$null) | Out-String
+  if ($LASTEXITCODE -eq 0 -and $inv.Trim()) {
+    # Eerst in een variabele: in 5.1 komt een JSON-lijst anders als een enkel ding terug.
+    $lijst = $inv | ConvertFrom-Json
+    foreach ($i in $lijst) {
+      if ($i.repository.owner.login -eq $Org) {
+        & gh api -X PATCH "user/repository_invitations/$($i.id)" 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { Say "Uitnodiging voor $($i.repository.name) geaccepteerd." }
+      }
+    }
   }
 }
 
@@ -143,7 +165,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("  ""slug"": ""$Slug"",")
 [void]$sb.AppendLine("  ""github_username"": ""$Gh"",")
 [void]$sb.AppendLine("  ""persoonlijk_repo"": ""$Pers"",")
-[void]$sb.AppendLine("  ""is_board"": $($Board.ToLower()),")
+[void]$sb.AppendLine("  ""is_board"": $Board,")
 [void]$sb.AppendLine("  ""lagen"": [")
 foreach ($p in $lagen) {
   $map = if ($p[0] -eq "bedrijf") { "." } else { $p[0] }
@@ -153,7 +175,8 @@ foreach ($p in $lagen) {
 [void]$sb.AppendLine("    { ""laag"": ""mijn-projecten"", ""map"": ""mijn-projecten"" }")
 [void]$sb.AppendLine("  ]")
 [void]$sb.AppendLine("}")
-$sb.ToString() | Set-Content -Encoding UTF8 (Join-Path $mf "aansluiting.json")
+# Zonder BOM: Windows PowerShell 5.1 zet bij -Encoding UTF8 drie onzichtbare tekens voor de JSON.
+[System.IO.File]::WriteAllText((Join-Path $mf "aansluiting.json"), $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
 
 Say "Aangesloten. Je Mainframe staat klaar in: $Dir"
 if (Get-Command code -ErrorAction SilentlyContinue) { & code $Dir 2>$null }

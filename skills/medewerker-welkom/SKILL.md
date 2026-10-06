@@ -22,6 +22,20 @@ Zorg dat `git`, `gh` (GitHub CLI) en `curl` aanwezig zijn. Ontbreekt er iets:
 - **curl** zit standaard op Windows 10+ en Mac.
 Installeer wat mist (of geef de persoon de link) en ga pas verder als alles er is.
 
+## Snelste route op Windows (installatiedag)
+Op de dag zelf is dit de standaard: per laptop EEN regel in een gewone PowerShell (niet in
+Claude Code). Zet Git en de GitHub-tool erop als ze ontbreken, laat de persoon inloggen met
+zijn eigen GitHub-account, accepteert de uitnodigingen en sluit aan:
+```powershell
+$env:MF_SLUG="<bedrijf-slug>"; irm https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/aansluiten.ps1 | iex
+```
+Getest op 6 oktober 2026 in Windows PowerShell 5.1 (schone Windows-machine, test-bv).
+
+**Inloggen bij GitHub gaat niet goed vanuit Claude Code zelf**: de opdrachtregel daar is niet
+interactief, dus de inlogcode blijft onzichtbaar tot het te laat is. Moet je toch vanuit
+Claude Code inloggen, laat de persoon dan zelf `! gh auth login --web -h github.com --git-protocol https`
+typen (met het uitroepteken), zodat de code in beeld komt.
+
 ## Stap 2: draai de aansluit-helper
 Run het meegeleverde script. Het regelt de GitHub-login, vraagt de veilige resolver welke
 lagen deze persoon mag ophalen, en cloont ALLEEN die lagen als submappen onder `mijn-mainframe/`.
@@ -37,7 +51,8 @@ lagen deze persoon mag ophalen, en cloont ALLEEN die lagen als submappen onder `
   ```
 Geef de voornaam mee als je die weet: `MF_VOORNAAM="Bart"` (Mac) / `$env:MF_VOORNAAM="Bart"` (Win).
 
-Tijdens het draaien opent een browser voor de GitHub-login (`gh auth login --web`). Laat de
+Tijdens het draaien opent een browser voor de GitHub-login (`gh auth login --web`). Openstaande
+uitnodigingen van het bedrijf accepteert het script zelf. Laat de
 persoon inloggen met zijn EIGEN account. Kan het script niet draaien op deze computer, doe dan
 de stappen uit "Handmatig vangnet" hieronder zelf, precies zo.
 
@@ -54,7 +69,7 @@ Sluit af met: "typ `/einde` als je klaar bent, dan sla ik je werk op de juiste p
 Doe dan zelf, in een lege werkmap `mijn-mainframe/`:
 1. `gh auth login --web` (eigen account) en pak de naam: `gh api user --jq .login`.
 2. Haal de lagen op:
-   `curl -fsS -H "Authorization: Bearer $(gh auth token)" "https://efficient-retriever-70.eu-west-1.convex.site/enterprise/mijn-lagen?slug=<SLUG>&github_username=<NAAM>"`
+   `curl -fsS -H "Authorization: Bearer $(gh auth token)" "https://api.slimwerken.ai/enterprise/mijn-lagen?slug=<SLUG>&github_username=<NAAM>"`
    (Zonder die GitHub-login weigert de server met 401; zo weet hij zeker dat jij het bent.)
    Dit geeft regels `ok=true`, `github_org=...`, `persoonlijk_repo=...` en `laag=..<tab>repo=..`.
    Bij `ok=false` (bv `geen_lid`): leg vriendelijk uit dat de beheerder de persoon eerst moet toevoegen.
