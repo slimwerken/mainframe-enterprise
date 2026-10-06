@@ -27,9 +27,15 @@ Op de dag zelf is dit de standaard: per laptop EEN regel in een gewone PowerShel
 Claude Code). Zet Git en de GitHub-tool erop als ze ontbreken, laat de persoon inloggen met
 zijn eigen GitHub-account, accepteert de uitnodigingen en sluit aan:
 ```powershell
-$env:MF_SLUG="<bedrijf-slug>"; irm https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/aansluiten.ps1 | iex
+$env:MF_ORG="<GitHub-organisatie>"; irm https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/aansluiten.ps1 | iex
 ```
-Getest op 6 oktober 2026 in Windows PowerShell 5.1 (schone Windows-machine, test-bv).
+Op een Mac in Terminal: `MF_ORG=<GitHub-organisatie> sh -c "$(curl -fsSL https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/medewerker-welkom.sh)"`.
+
+**Met MF_ORG komt alles uit GitHub zelf** (sinds 6 oktober 2026): welke mappen iemand krijgt volgt
+uit zijn teams in de organisatie (Directie, een afgeschermd team). Er is geen server van Slim Werken
+voor nodig; het bedrijf beheert zijn team zelf met `/team`. `MF_SLUG` is de oude route via de
+aansluit-server en blijft werken voor bedrijven die nog niet over zijn.
+Getest op 6 oktober 2026 in Windows PowerShell 5.1 (schone Windows-machine) en op de Mac, tegen de testorganisatie.
 
 **Inloggen bij GitHub gaat niet goed vanuit Claude Code zelf**: de opdrachtregel daar is niet
 interactief, dus de inlogcode blijft onzichtbaar tot het te laat is. Moet je toch vanuit

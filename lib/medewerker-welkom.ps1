@@ -2,7 +2,8 @@
 # Spiegel van lib/medewerker-welkom.sh. Leest bij de veilige Convex-resolver welke lagen
 # deze persoon mag ophalen, en cloont ALLEEN die lagen als submappen onder mijn-mainframe/.
 #
-# Env: MF_SLUG (verplicht), MF_DIR (default $HOME\mijn-mainframe), MF_GH, MF_VOORNAAM,
+# Env: MF_ORG (GitHub-organisatie; dan komt alles uit GitHub zelf, geen andere server nodig)
+#      of MF_SLUG (oud, via de aansluit-server), MF_DIR (default $HOME\mijn-mainframe), MF_GH, MF_VOORNAAM,
 #      MF_ENDPOINT (default de Mainframe Convex-host), MF_DRYRUN=1
 # "Continue" en niet "Stop": in Windows PowerShell 5.1 (de standaard op Windows) telt een
 # foutregel van git of gh die je met 2>$null wegstuurt als een fout. Met "Stop" brak het
@@ -12,8 +13,9 @@ $ErrorActionPreference = "Continue"
 
 function Say($m) { Write-Host "  $m" }
 
-$Slug = $env:MF_SLUG
-if (-not $Slug) { Say "Zet MF_SLUG op je bedrijf (bv test-bv)."; exit 1 }
+$OrgLokaal = $env:MF_ORG
+$Slug = if ($env:MF_SLUG) { $env:MF_SLUG } elseif ($OrgLokaal) { $OrgLokaal.ToLower() } else { $null }
+if (-not $Slug) { Say "Zet MF_ORG op de GitHub-organisatie van je bedrijf (bv QDP-BV)."; exit 1 }
 $Dir = if ($env:MF_DIR) { $env:MF_DIR } else { Join-Path $HOME "mijn-mainframe" }
 $Endpoint = if ($env:MF_ENDPOINT) { $env:MF_ENDPOINT } else { "https://api.slimwerken.ai" }
 
@@ -37,6 +39,38 @@ if (-not $Gh) { $ghUit = & gh api user --jq .login 2>$null; if ($ghUit) { $Gh = 
 if (-not $Gh) { Say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth login'."; exit 1 }
 Say "Ingelogd als $Gh."
 
+if ($OrgLokaal) {
+# 3 (zonder server). Eerst de uitnodigingen accepteren, dan zie je je teams.
+$Org = $OrgLokaal
+if ($env:MF_DRYRUN -ne "1") {
+  & gh api -X PATCH "user/memberships/orgs/$Org" -f state=active 2>$null | Out-Null
+  $inv = (& gh api user/repository_invitations 2>$null) | Out-String
+  if ($inv.Trim()) {
+    $lijst = $inv | ConvertFrom-Json
+    foreach ($i in $lijst) { if ($i.repository.owner.login -eq $Org) { & gh api -X PATCH "user/repository_invitations/$($i.id)" 2>$null | Out-Null; Say "Uitnodiging voor $($i.repository.name) geaccepteerd." } }
+  }
+}
+$staat = ([string](& gh api "user/memberships/orgs/$Org" --jq .state 2>$null)).Trim()
+if ($staat -ne "active") {
+  Say "Je bent (nog) geen lid van $Org. Vraag een beheerder je toe te voegen en Doorvoeren te kiezen,"
+  Say "of accepteer de uitnodiging via https://github.com/orgs/$Org/invitation en draai dit opnieuw."; exit 1
+}
+$teamsJson = (& gh api user/teams --paginate 2>$null) | Out-String
+$lagenTekst = "ok=true`nlaag=bedrijf`trepo=mainframe-bedrijf`nlaag=bedrijfsprojecten`trepo=mainframe-bedrijfsprojecten"
+$Board = "false"; $afd = $null
+if ($teamsJson.Trim()) {
+  # --paginate kan meerdere lijsten achter elkaar geven: ][ samenvoegen.
+  $alle = ($teamsJson -replace '\]\s*\[', ',') | ConvertFrom-Json
+  foreach ($tm in $alle) {
+    if ($tm.organization.login -ne $Org) { continue }
+    if ($tm.slug -eq "directie") { $Board = "true"; $lagenTekst += "`nlaag=directie`trepo=mainframe-directie" }
+    elseif ($tm.slug -ne "iedereen" -and -not $afd) { $afd = $tm.slug; $lagenTekst += "`nlaag=afdeling`trepo=mainframe-$($tm.slug)" }
+  }
+}
+$lines = $lagenTekst -split "`n"
+$Pers = "mainframe-persoonlijk-$($Gh.ToLower())"; $Naam = $env:MF_VOORNAAM
+Say "Bedrijf gevonden: org $Org. Ik haal alleen jouw lagen op."
+} else {
 # 3. Vraag de resolver welke lagen jij mag ophalen.
 if ($Endpoint -ne "https://api.slimwerken.ai") {
   Say "Deze aansluit-server is niet vertrouwd. Verwijder MF_ENDPOINT en probeer opnieuw."; exit 1
@@ -66,6 +100,7 @@ $Org = Field "github_org"; $Naam = Field "naam"; $Pers = Field "persoonlijk_repo
 if ($Board -ne "true") { $Board = "false" }
 if ($env:MF_VOORNAAM) { $Naam = $env:MF_VOORNAAM }
 Say "Bedrijf gevonden: org $Org. Ik haal alleen jouw lagen op."
+}
 
 $lagen = @()
 foreach ($l in $lines) {

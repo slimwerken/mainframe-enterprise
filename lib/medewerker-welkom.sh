@@ -5,7 +5,9 @@
 # komen uit de eigen kluis en blijven prive. Geen jq/python nodig.
 #
 # Env:
-#   MF_SLUG      (verplicht) bedrijf-slug, bv test-bv
+#   MF_ORG       GitHub-organisatie van het bedrijf, bv QDP-BV. Dan haalt het script ALLES uit
+#                GitHub zelf (welke mappen je mag, via je teams) en is er geen andere server nodig.
+#   MF_SLUG      (oud, alleen zonder MF_ORG) bedrijf-slug bij de aansluit-server
 #   MF_DIR       (default $HOME/mijn-mainframe) de werkmap
 #   MF_GH        (optioneel) github-naam; anders via gh afgeleid
 #   MF_VOORNAAM  (optioneel) voor ik/over-mij.md
@@ -13,7 +15,11 @@
 #   MF_DRYRUN=1  toon wat er zou gebeuren
 set -e
 
-SLUG="${MF_SLUG:?zet MF_SLUG op je bedrijf (bv test-bv)}"
+ORG_LOKAAL="${MF_ORG:-}"
+if [ -z "$ORG_LOKAAL" ] && [ -z "${MF_SLUG:-}" ]; then
+  printf '  %s\n' "Zet MF_ORG op de GitHub-organisatie van je bedrijf (bv QDP-BV)."; exit 1
+fi
+SLUG="${MF_SLUG:-$(printf '%s' "$ORG_LOKAAL" | tr 'A-Z' 'a-z')}"
 DIR="${MF_DIR:-$HOME/mijn-mainframe}"
 ENDPOINT="${MF_ENDPOINT:-https://api.slimwerken.ai}"
 TAB="$(printf '\t')"
@@ -44,6 +50,36 @@ GH="${MF_GH:-$(gh api user --jq .login 2>/dev/null || true)}"
 if [ -z "$GH" ]; then say "Kon je GitHub-naam niet bepalen. Log in met 'gh auth login'."; exit 1; fi
 say "Ingelogd als $GH."
 
+if [ -n "$ORG_LOKAAL" ]; then
+# 3 (zonder server). Eerst de uitnodigingen accepteren, dan zie je je teams.
+ORG="$ORG_LOKAAL"
+if [ "$MF_DRYRUN" != "1" ]; then
+  gh api -X PATCH "user/memberships/orgs/$ORG" -f state=active >/dev/null 2>&1 || true
+  for id in $(gh api user/repository_invitations --jq ".[] | select(.repository.owner.login==\"$ORG\") | .id" 2>/dev/null); do
+    gh api -X PATCH "user/repository_invitations/$id" >/dev/null 2>&1 && say "Uitnodiging voor je kluis geaccepteerd."
+  done
+fi
+STAAT="$(gh api "user/memberships/orgs/$ORG" --jq .state 2>/dev/null || true)"
+if [ "$STAAT" != "active" ]; then
+  say "Je bent (nog) geen lid van $ORG. Vraag een beheerder je toe te voegen en Doorvoeren te kiezen,"
+  say "of accepteer de uitnodiging via https://github.com/orgs/$ORG/invitation en draai dit opnieuw."; exit 1
+fi
+ORGL="$(printf '%s' "$ORG" | tr 'A-Z' 'a-z')"
+TEAMS="$(gh api user/teams --paginate --jq ".[] | select((.organization.login|ascii_downcase)==\"$ORGL\") | .slug" 2>/dev/null || true)"
+BOARD=false
+RESP="$(printf 'ok=true\nlaag=bedrijf%srepo=mainframe-bedrijf\nlaag=bedrijfsprojecten%srepo=mainframe-bedrijfsprojecten\n' "$TAB" "$TAB")"
+AFD=""
+for t in $TEAMS; do
+  case "$t" in
+    iedereen) ;;
+    directie) BOARD=true; RESP="$RESP$(printf '\nlaag=directie%srepo=mainframe-directie' "$TAB")";;
+    *) [ -z "$AFD" ] && AFD="$t" && RESP="$RESP$(printf '\nlaag=afdeling%srepo=mainframe-%s' "$TAB" "$t")";;
+  esac
+done
+PERS="mainframe-persoonlijk-$(printf '%s' "$GH" | tr 'A-Z' 'a-z')"
+NAAM="${MF_VOORNAAM:-}"
+say "Bedrijf gevonden: org $ORG. Ik haal alleen jouw lagen op."
+else
 # 3. Vraag de resolver welke lagen jij mag ophalen (veilig, geen geheimen).
 # Alleen de eigen vertrouwde HTTPS-host mag het GitHub-token ontvangen.
 if [ "$ENDPOINT" != "https://api.slimwerken.ai" ]; then
@@ -75,6 +111,7 @@ PERS="$(printf '%s\n' "$RESP" | sed -n 's/^persoonlijk_repo=//p' | head -1)"
 BOARD="$(printf '%s\n' "$RESP" | sed -n 's/^is_board=//p' | head -1)"
 [ -n "$MF_VOORNAAM" ] && NAAM="$MF_VOORNAAM"
 say "Bedrijf gevonden: org $ORG. Ik haal alleen jouw lagen op."
+fi
 
 # 3b. Openstaande GitHub-uitnodigingen van dit bedrijf zelf accepteren. Zonder dat geeft
 # ophalen een 404 ("repository not found"): de meest voorkomende vastloper bij Horti (juli 2026).
