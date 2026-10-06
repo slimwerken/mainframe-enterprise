@@ -80,8 +80,10 @@ if ($LASTEXITCODE -ne 0 -or -not $MfGhToken) {
   Say "Je GitHub-login is verlopen. Log opnieuw in met 'gh auth login'."; exit 1
 }
 try {
-  $slugQuery = [uri]::EscapeDataString($Slug)
-  $ghQuery = [uri]::EscapeDataString($Gh)
+  # Slug en GitHub-naam bestaan alleen uit letters, cijfers en streepjes: geen codering nodig
+  # (en [uri] is niet beschikbaar in de beperkte stand van PowerShell).
+  $slugQuery = $Slug -replace '[^A-Za-z0-9._-]', ''
+  $ghQuery = $Gh -replace '[^A-Za-z0-9._-]', ''
   $resp = (Invoke-WebRequest -UseBasicParsing -ErrorAction Stop -Headers @{ Authorization = "Bearer $MfGhToken" } -Uri "$Endpoint/enterprise/mijn-lagen?slug=$slugQuery&github_username=$ghQuery").Content
 } catch { Say "Aansluiten lukt niet. Controleer je GitHub-login en probeer opnieuw."; exit 1 }
 finally { $MfGhToken = $null }
@@ -194,24 +196,23 @@ if (-not (Test-Path $envFile)) { "# Jouw persoonlijke sleutels (API-keys, tokens
 # 6. Aansluit-config voor /einde.
 $mf = Join-Path $Dir ".mainframe"
 New-Item -ItemType Directory -Force -Path $mf | Out-Null
-$sb = New-Object System.Text.StringBuilder
-[void]$sb.AppendLine("{")
-[void]$sb.AppendLine("  ""github_org"": ""$Org"",")
-[void]$sb.AppendLine("  ""slug"": ""$Slug"",")
-[void]$sb.AppendLine("  ""github_username"": ""$Gh"",")
-[void]$sb.AppendLine("  ""persoonlijk_repo"": ""$Pers"",")
-[void]$sb.AppendLine("  ""is_board"": $Board,")
-[void]$sb.AppendLine("  ""lagen"": [")
+# Alleen gewone tekst en Set-Content: werkt ook in de beperkte stand (ConstrainedLanguage).
+$json = "{`n"
+$json += "  ""github_org"": ""$Org"",`n"
+$json += "  ""slug"": ""$Slug"",`n"
+$json += "  ""github_username"": ""$Gh"",`n"
+$json += "  ""persoonlijk_repo"": ""$Pers"",`n"
+$json += "  ""is_board"": $Board,`n"
+$json += "  ""lagen"": [`n"
 foreach ($p in $lagen) {
   $map = if ($p[0] -eq "bedrijf") { "." } else { $p[0] }
-  [void]$sb.AppendLine("    { ""laag"": ""$($p[0])"", ""repo"": ""$($p[1])"", ""map"": ""$map"" },")
+  $json += "    { ""laag"": ""$($p[0])"", ""repo"": ""$($p[1])"", ""map"": ""$map"" },`n"
 }
-[void]$sb.AppendLine("    { ""laag"": ""ik"", ""map"": ""ik"" },")
-[void]$sb.AppendLine("    { ""laag"": ""mijn-projecten"", ""map"": ""mijn-projecten"" }")
-[void]$sb.AppendLine("  ]")
-[void]$sb.AppendLine("}")
-# Zonder BOM: Windows PowerShell 5.1 zet bij -Encoding UTF8 drie onzichtbare tekens voor de JSON.
-[System.IO.File]::WriteAllText((Join-Path $mf "aansluiting.json"), $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+$json += "    { ""laag"": ""ik"", ""map"": ""ik"" },`n"
+$json += "    { ""laag"": ""mijn-projecten"", ""map"": ""mijn-projecten"" }`n"
+$json += "  ]`n}`n"
+# ASCII: geen onzichtbare BOM-tekens voor de JSON (namen zijn altijd ASCII).
+Set-Content -Encoding Ascii -NoNewline -Path (Join-Path $mf "aansluiting.json") -Value $json
 
 Say "Aangesloten. Je Mainframe staat klaar in: $Dir"
 if (Get-Command code -ErrorAction SilentlyContinue) { & code $Dir 2>$null }

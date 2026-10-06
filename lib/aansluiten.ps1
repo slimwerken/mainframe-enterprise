@@ -12,7 +12,11 @@ function Say($m) { Write-Host "  $m" }
 if (-not $env:MF_SLUG -and -not $env:MF_ORG) { Say "Zet eerst je bedrijf: `$env:MF_ORG=`"<GitHub-organisatie>`""; return }
 
 function VerversPad {
-  $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+  # Uit het register, zonder .NET-aanroepen: die zijn geblokkeerd als PowerShell in de beperkte
+  # stand draait (ConstrainedLanguage, bij bedrijfslaptops met WDAC/Intune).
+  $m = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name Path -ErrorAction SilentlyContinue).Path
+  $u = (Get-ItemProperty "HKCU:\Environment" -Name Path -ErrorAction SilentlyContinue).Path
+  $env:Path = "$m;$u"
 }
 
 # 1. Git en gh. Winget zit op Windows 10 en 11; de installatie vraagt soms om Ja.
