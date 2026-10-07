@@ -83,6 +83,16 @@ if (-not $dir) {
   Say "Je Mainframe-map niet gevonden. Ga in PowerShell eerst naar je map (cd <map>) en draai de regel opnieuw."
   return
 }
+# 1Password CLI leest geen .env met een BOM vooraan (QDP, 7 okt 2026: "expected '=' at line 1").
+$envPad = Join-Path $dir "ik\.env"
+if (Test-Path $envPad) {
+  $kop = Get-Content -Encoding Byte -TotalCount 3 -Path $envPad -ErrorAction SilentlyContinue
+  if ($kop -and $kop.Count -eq 3 -and $kop[0] -eq 239 -and $kop[1] -eq 187 -and $kop[2] -eq 191) {
+    $inhoud = Get-Content -Raw -Encoding UTF8 -Path $envPad
+    Set-Content -Path $envPad -Value $inhoud -Encoding Ascii -NoNewline
+    Say "ik\.env opgeschoond (onzichtbaar teken vooraan weggehaald)."
+  }
+}
 $bin = Join-Path $HOME ".mainframe\bin"
 New-Item -ItemType Directory -Force -Path $bin | Out-Null
 $cmd = @(
