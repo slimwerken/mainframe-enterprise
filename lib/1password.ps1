@@ -34,7 +34,7 @@ $app = @(
 if (-not $app -and -not $env:MF_OP_ZONDER_APP) {
   Say "De 1Password-app staat nog niet op deze laptop."
   Say "Installeer hem via het Bedrijfsportal (Company Portal), of vraag de IT-partner."
-  Say "Log in met je uitnodiging van 1Password en draai deze regel daarna opnieuw."
+  Say "Log in met je uitnodiging van 1Password en draai daarna de 1Password-regel van de uitlegpagina."
   return
 }
 if ($app) { Say "1Password-app gevonden." }
@@ -107,12 +107,11 @@ if ($LASTEXITCODE -ne 0) {
   Say ""
   Say "Nog een ding in de 1Password-app: Instellingen > Ontwikkelaar (Developer) >"
   Say "zet 'Integrate with 1Password CLI' aan. Laat de app open en ontgrendeld."
-  Say "Draai daarna deze regel opnieuw."
+  Say "Draai daarna de 1Password-regel van de uitlegpagina."
   return
 }
 Say "1Password is gekoppeld. Je kluizen:"
 & op vault list
 Say ""
-Say "Klaar. Nu:"
-Say "1. Typ in Claude Code: /kluis   (zet je sleutels in 1Password)"
-Say "2. Sluit VS Code helemaal. Open hem voortaan met 'Mainframe starten' op je bureaublad."
+Say "1Password is klaar. Sluit VS Code helemaal en open je Mainframe voortaan met 'Mainframe starten'."
+Say "Heb je al eigen sleutels in je Mainframe? Typ dan in Claude Code: /kluis"
