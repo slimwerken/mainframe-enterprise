@@ -31,6 +31,16 @@ $app = @(
   (Join-Path $env:LOCALAPPDATA "1Password\app\8\1Password.exe"),
   (Join-Path $env:ProgramFiles "1Password\app\8\1Password.exe")
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $app -and -not $env:MF_OP_ZONDER_APP -and (Heeft "winget")) {
+  # Eerst zelf proberen; lukt het niet (IT houdt het tegen), dan via het Bedrijfsportal.
+  Say "De 1Password-app installeren. Vraagt Windows om toestemming? Klik op Ja."
+  & winget install -e --id AgileBits.1Password --silent --accept-package-agreements --accept-source-agreements | Out-Null
+  $app = @(
+    (Join-Path $env:LOCALAPPDATA "1Password\app\8\1Password.exe"),
+    (Join-Path $env:ProgramFiles "1Password\app\8\1Password.exe")
+  ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if ($app) { Say "1Password-app staat erop. Open hem en log in met je uitnodiging uit de mail." }
+}
 if (-not $app -and -not $env:MF_OP_ZONDER_APP) {
   Say "De 1Password-app staat nog niet op deze laptop."
   Say "Installeer hem via het Bedrijfsportal (Company Portal), of vraag de IT-partner."
