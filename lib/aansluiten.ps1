@@ -59,6 +59,18 @@ $tmp = Join-Path $env:TEMP "medewerker-welkom.ps1"
 try { Invoke-WebRequest -UseBasicParsing -ErrorAction Stop -Uri $bron -OutFile $tmp }
 catch { Say "Kon de aansluiting niet ophalen. Check de internetverbinding en probeer opnieuw."; return }
 & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp
-if ($LASTEXITCODE -eq 0) {
-  Say "Klaar. Open Claude Code in je map mijn-mainframe en typ /ophalen."
+if ($LASTEXITCODE -ne 0) { return }
+Say "Je Mainframe staat klaar."
+
+# 4. 1Password erbij (7 okt 2026, QDP): CLI, de knop Mainframe starten en de test. Staat de
+# 1Password-app er nog niet op, dan zegt het script dat en gaat het aansluiten gewoon goed.
+if (-not $env:MF_ZONDER_1PASSWORD) {
+  Say ""
+  Say "Nu 1Password koppelen."
+  $opBron = if ($env:MF_1PASSWORD_BRON) { $env:MF_1PASSWORD_BRON } else { "https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/1password.ps1" }
+  try { $opScript = Invoke-WebRequest -UseBasicParsing -ErrorAction Stop -Uri $opBron } catch { $opScript = $null }
+  if ($opScript) { & { Invoke-Expression $opScript.Content } }
+  else { Say "1Password-stap kon niet worden opgehaald. Draai later de 1Password-regel van de uitlegpagina." }
 }
+Say ""
+Say "Open je Mainframe met 'Mainframe starten' op je bureaublad (of VS Code, map mijn-mainframe) en typ in Claude Code /ophalen."
