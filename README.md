@@ -12,6 +12,13 @@ Open Claude Code in een lege map en plak deze regel (vervang de bedrijf-code):
 
 Claude regelt de rest: inloggen met je eigen GitHub, en alleen jouw lagen ophalen.
 
+### Mac, in een regel (Terminal)
+
+    MF_ORG="JOUW-GITHUB-ORGANISATIE" /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slimwerken/mainframe-enterprise/main/lib/aansluiten.sh)"
+
+Zet Apple's gereedschap, de GitHub-tool en 1Password CLI erop, laat je inloggen, sluit aan en maakt
+de knop Mainframe starten op je bureaublad. Windows: dezelfde stap met `aansluiten.ps1` in PowerShell.
+
 ### 2. Je hebt nog niks
 Gebruik de Mainframe-installer (Windows of Mac). Kies bij het starten "aansluiten op mijn
 bedrijf" en vul je bedrijf-code in. De installer zet VS Code + Claude Code klaar en start

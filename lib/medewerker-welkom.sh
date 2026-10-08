@@ -201,7 +201,8 @@ mkdir -p "$DIR/.mainframe"
 
 say "Aangesloten. Je Mainframe staat klaar in: $DIR"
 
-# 7. Open VS Code als het er is.
-if command -v code >/dev/null 2>&1; then
+# 7. Open VS Code als het er is. Niet als aansluiten.sh ons draait: die opent hem straks zelf,
+# met de sleutels uit 1Password (een al geopende VS Code krijgt die niet meer mee).
+if [ -z "${MF_GEEN_CODE:-}" ] && command -v code >/dev/null 2>&1; then
   code "$DIR" >/dev/null 2>&1 || true
 fi
